@@ -9,8 +9,23 @@ var mouse = {
     y: innerHeight/2
 }
 
-window.addEventListener('click', function(e){
-    
+var mouseposition = {
+    x: innerWidth/2,
+    y: innerHeight/2
+}
+
+var mousedown = false;
+var color = null;
+
+window.addEventListener('mousedown', function(e){
+    mouseposition.x = e.clientX;
+    mouseposition.y = e.clientY;
+    mousedown = true;
+});
+
+window.addEventListener('mouseup', function(e){
+   mousedown = false;
+   color = null;
 });
 
 window.addEventListener('mousemove', function(e){
@@ -43,6 +58,18 @@ function Particle(x, y, radius, color){
 Particle.prototype.update = function(particles) {
     this.draw();
 
+
+    if(mousedown){
+        let xd = mouseposition.x - this.x;
+        let yd = mouseposition.y - this.y;
+        let distance = Math.sqrt(Math.pow(xd, 2) + Math.pow(yd, 2));
+
+        if(distance > 1){
+            this.x += xd * 0.05;
+            this.y += yd * 0.05;
+        }
+    }
+
     for(let i = 0; i < particles.length; i++){
         if(this === particles[i]) continue;
         if(distance(this.x, this.y, particles[i].x, particles[i].y) - this.radius * 2 <= 0){
@@ -54,7 +81,7 @@ Particle.prototype.update = function(particles) {
         this.velocity.x = -this.velocity.x;
     }
 
-    if(this.y - this.radius <= 0 || this.y + this.radius >= window.innerWidth){
+    if(this.y - this.radius <= 0 || this.y + this.radius >= window.innerHeight){
         this.velocity.y = -this.velocity.y;
     }
 
@@ -134,7 +161,7 @@ function init(){
     particles = [];
     let radius = 30;
 
-    for(let i = 0; i < 90; i++){
+    for(let i = 0; i < 50; i++){
         let x = randomIntFromRange(radius, window.innerWidth - radius);
         let y = randomIntFromRange(radius, window.innerHeight - radius);
 
