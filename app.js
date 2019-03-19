@@ -1,12 +1,13 @@
 var canvas = document.getElementById('canvas');
 var c = canvas.getContext('2d');
+var time = null;
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 var mouse = {
-    x: innerWidth/2,
-    y: innerHeight/2
+    x: window.innerWidth/2,
+    y: window.innerHeight/2
 }
 
 var mouseposition = {
@@ -15,17 +16,16 @@ var mouseposition = {
 }
 
 var mousedown = false;
-var color = null;
 
 window.addEventListener('mousedown', function(e){
     mouseposition.x = e.clientX;
     mouseposition.y = e.clientY;
     mousedown = true;
+    time = new Date().getTime();
 });
 
 window.addEventListener('mouseup', function(e){
    mousedown = false;
-   color = null;
 });
 
 window.addEventListener('mousemove', function(e){
@@ -38,72 +38,100 @@ window.addEventListener('resize', function(){
     canvas.height = window.innerHeight;
 
     init();
-})
+});
 
-var colors = ['#105B63', '#FFFAD5', '#FFD34E', '#DB9E36', '#BD4932'];
+var colors = [
+    {r: 255, g: 71, b: 71},
+    {r: 0, g: 206, b: 237},
+    {r: 255, g: 255, b: 255}
+  ];
 
-function Particle(x, y, radius, color){
+function Particle(x, y, dx, dy, radius){
     this.x = x;
     this.y = y;
     this.radius = radius;
-    this.color = color;
+    this.randomColor =  Math.floor(Math.random() * colors.length);;
     this.mass = 1;
-    this.opacity = 0;
+    this.opacity = 1;
+    this.deleted = false;
+    this.timeToLive = 8;
+    this.type = dx && dy? 'T1' : 'T2';
     this.velocity = {
-        x: (Math.random() - 0.5) * 4,
-        y: (Math.random() - 0.5) * 4
+        x:  dx || (Math.random() - 0.5) * 4,
+        y:  dy || (Math.random() - 0.5) * 4
     };
 }
 
+Particle.prototype.remove = function(){
+    return this.timeToLive <= 0;
+}
+
 Particle.prototype.update = function(particles) {
+
     this.draw();
 
-
-    if(mousedown){
-        let xd = mouseposition.x - this.x;
-        let yd = mouseposition.y - this.y;
-        let distance = Math.sqrt(Math.pow(xd, 2) + Math.pow(yd, 2));
-
-        if(distance > 1){
-            this.x += xd * 0.05;
-            this.y += yd * 0.05;
+    if(this.type === "T2"){
+        if(mousedown){
+            let xd = mouseposition.x - this.x;
+            let yd = mouseposition.y - this.y;
+            let distance = Math.sqrt(Math.pow(xd, 2) + Math.pow(yd, 2));
+    
+            if(distance > 90){
+                this.x += xd * 0.05;
+                this.y += yd * 0.05;
+            }
         }
-    }
-
-    for(let i = 0; i < particles.length; i++){
-        if(this === particles[i]) continue;
-        if(distance(this.x, this.y, particles[i].x, particles[i].y) - this.radius * 2 <= 0){
-            resolveCollision(this, particles[i]);
+    
+        for(let i = 0; i < particles.length; i++){
+            if(this === particles[i]) continue;
+            if(distance(this.x, this.y, particles[i].x, particles[i].y) - this.radius * 2 <= 0){
+                resolveCollision(this, particles[i]);
+            }
         }
-    }
-
-    if(this.x - this.radius <= 0 || this.x + this.radius >= window.innerWidth){
-        this.velocity.x = -this.velocity.x;
-    }
-
-    if(this.y - this.radius <= 0 || this.y + this.radius >= window.innerHeight){
-        this.velocity.y = -this.velocity.y;
-    }
-
-    if(distance(mouse.x, mouse.y, this.x, this.y) < 100 && this.opacity < 0.8 ){
-        this.opacity += 0.8;
-    }else if(this.opacity >= 0.8){
-        this.opacity = 0;
+    
+        if(this.x - this.radius <= 0 || this.x + this.radius >= window.innerWidth){
+            this.velocity.x = -this.velocity.x;
+        }
+    
+        if(this.y - this.radius <= 0 || this.y + this.radius >= window.innerHeight){
+            this.velocity.y = -this.velocity.y;
+        }
     }
 
     this.x += this.velocity.x;
     this.y += this.velocity.y;
+    
+    if(mousedown && new Date().getTime() - time > 3000){
+        this.deleted = true;
+    }
+
+    if(this.type === "T1"){
+
+        if (this.x + this.radius >= canvas.width || this.x - this.radius <= 0)
+        this.dx = -this.dx
+
+        if (this.y + this.radius >= canvas.height || this.y - this.radius <= 0)
+            this.dy = -this.dy
+
+        this.x = Math.min(Math.max(this.x, 0 + this.radius), canvas.width - this.radius)
+        this.y = Math.min(Math.max(this.y, 0 + this.radius), canvas.height - this.radius)
+
+        this.opacity -= 1 / (this.timeToLive / 0.01)
+        this.radius -= this.radius/ (this.timeToLive / 0.01)
+    
+        if (this.radius < 0) this.radius = 0 
+    
+        this.timeToLive -= 0.01
+    }
 }
 
 Particle.prototype.draw = function() {
     c.beginPath();
     c.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    c.save();
-    c.globalAlpha = this.opacity;
-    c.fillStyle = this.color;
-    c.fill();
-    c.restore();
-    c.strokeStyle = this.color;
+    c.strokeStyle = 'rgba(' +colors[this.randomColor].r +',' +
+                            colors[this.randomColor].g +',' +
+                            colors[this.randomColor].b +',' +
+                            this.opacity +')';
     c.stroke();
     c.closePath();
 }
@@ -161,7 +189,7 @@ function init(){
     particles = [];
     let radius = 30;
 
-    for(let i = 0; i < 50; i++){
+    for(let i = 0; i < 70; i++){
         let x = randomIntFromRange(radius, window.innerWidth - radius);
         let y = randomIntFromRange(radius, window.innerHeight - radius);
 
@@ -175,12 +203,14 @@ function init(){
             }
         }
 
-        let color = colors[Math.floor(Math.random() * colors.length)];
-        particles.push(new Particle(x, y, radius, color));
+        particles.push(new Particle(x, y, null, null, radius));
     }
 }
 
 function animate(){
+
+    if(particles.length == 0) return;
+
     requestAnimationFrame(animate);
 
     c.fillStyle = 'rgba(0, 0, 0, 0.05)';
@@ -188,7 +218,55 @@ function animate(){
 
     particles.forEach(p => {
         p.update(particles);
-    })
+    });
+
+    particles = particles.filter(a => !a.deleted)
+    if(particles.length === 0){
+        c.fillStyle = 'rgba(0, 0, 0)';
+        c.fillRect(0, 0, canvas.width, canvas.height);
+        time = null;
+        animateExplosions();
+    }
+}
+
+function Explosion(x, y) {
+    this.particles = [];	
+  
+    this.init = function() {
+      for (var i = 1; i <= 1; i++) {
+        var randomVelocity = {
+          x: (Math.random() - 0.5) * 3.5,
+          y: (Math.random() - 0.5) * 3.5,
+        }
+        this.particles.push(new Particle(x, y, randomVelocity.x, randomVelocity.y, 30));				
+      }
+    }
+  
+    this.init();
+  
+    this.draw = function() {
+      for (var i = 0; i < this.particles.length; i++) {
+        this.particles[i].update();	
+  
+        if (this.particles[i].remove() == true) {
+          this.particles.splice(i, 1);	
+        };
+      }	
+    }
+  }
+
+var explosions = [];
+function animateExplosions() {
+    window.requestAnimationFrame(animateExplosions);
+
+    c.fillStyle = "#1e1e1e";
+    c.fillRect(0, 0, canvas.width, canvas.height);
+
+    explosions.push(new Explosion(mouse.x, mouse.y));
+
+    for (var i = 0; i < explosions.length; i++) {
+        explosions[i].draw();
+    }
 }
 
 init();
